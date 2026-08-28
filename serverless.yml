@@ -1,0 +1,84 @@
+service: printify-printful-shopify-sync
+frameworkVersion: "4"
+
+build:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node24
+
+provider:
+  name: aws
+  runtime: nodejs24.x
+  architecture: arm64
+  region: ${opt:region, 'eu-central-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 60
+  logRetentionInDays: 14
+  tracing:
+    lambda: true
+  httpApi:
+    cors: false
+  environment:
+    STAGE: ${sls:stage}
+    SHOPIFY_SHOP: ${env:SHOPIFY_SHOP}
+    SHOPIFY_API_VERSION: ${env:SHOPIFY_API_VERSION, '2026-07'}
+    SHOPIFY_LOCATION_ID: ${env:SHOPIFY_LOCATION_ID}
+    SHOPIFY_TOKEN_PARAMETER: /print-sync/${sls:stage}/shopify-access-token
+    PRINTIFY_TOKEN_PARAMETER: /print-sync/${sls:stage}/printify-token
+    PRINTFUL_TOKEN_PARAMETER: /print-sync/${sls:stage}/printful-token
+    IMPORT_API_KEY_PARAMETER: /print-sync/${sls:stage}/import-api-key
+    PRINTIFY_SHOP_ID: ${env:PRINTIFY_SHOP_ID, ''}
+    PRINTIFY_CURRENCY: ${env:PRINTIFY_CURRENCY, 'USD'}
+    PRINTFUL_STORE_ID: ${env:PRINTFUL_STORE_ID, ''}
+    PRINTFUL_SELLING_REGION: ${env:PRINTFUL_SELLING_REGION, 'worldwide'}
+    PRINTFUL_CURRENCY: ${env:PRINTFUL_CURRENCY, 'USD'}
+    MARKUP_MULTIPLIER: ${env:MARKUP_MULTIPLIER, '1.5'}
+    MARKUP_FIXED_AMOUNT: ${env:MARKUP_FIXED_AMOUNT, '5'}
+    IN_STOCK_QUANTITY: ${env:IN_STOCK_QUANTITY, '100'}
+    SECRET_CACHE_TTL_MS: ${env:SECRET_CACHE_TTL_MS, '300000'}
+    SYNC_PAGE_SIZE: ${env:SYNC_PAGE_SIZE, '100'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+          Resource:
+            - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/print-sync/${sls:stage}/*
+        - Effect: Allow
+          Action:
+            - lambda:InvokeFunction
+          Resource:
+            - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${sls:stage}-syncInventory
+
+functions:
+  importProduct:
+    handler: src/handlers/importProduct.handler
+    timeout: 120
+    events:
+      - httpApi:
+          path: /import
+          method: post
+  syncInventory:
+    handler: src/handlers/syncInventory.handler
+    timeout: 300
+    reservedConcurrency: 1
+    maximumRetryAttempts: 2
+    maximumEventAge: 21600
+    events:
+      - schedule:
+          name: ${self:service}-${sls:stage}-every-four-hours
+          description: Sync Printify and Printful availability to Shopify every four hours
+          rate: cron(0 */4 * * ? *)
+          enabled: true
+
+package:
+  individually: true
+  patterns:
+    - "!tests/**"
+    - "!.github/**"
+    - "!coverage/**"

@@ -1,0 +1,31 @@
+{
+  "name": "printify-printful-shopify-automation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Serverless Printify/Printful to Shopify product import and inventory availability sync.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "deploy": "serverless deploy",
+    "deploy:dev": "serverless deploy --stage dev",
+    "remove": "serverless remove",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.0.0",
+    "@aws-sdk/client-ssm": "^3.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^24.0.0",
+    "serverless": "^4.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0"
+  }
+}
